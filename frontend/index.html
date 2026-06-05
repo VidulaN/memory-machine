@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Teleagriculture — Soil Memory Machine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css"/>
+<style>
+/* ── Reset & tokens ───────────────────────────────────────────────────────── */
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#F7F6F2;--surface:#FFFFFF;--surface2:#F0EEE8;--border:#E2DFD5;--border2:#C9C5B8;
+  --text:#1A1916;--text2:#6B6860;--text3:#9C9A93;
+  --soil:#8B5E3C;--soil-l:#C49A6C;--soil-d:#5C3A1E;
+  --rain:#2563EB;--rain-l:#DBEAFE;
+  --sun:#F59E0B;--sun-l:#FEF3C7;
+  --low:#16A34A;--low-l:#DCFCE7;
+  --mid:#D97706;--mid-l:#FEF3C7;
+  --high:#DC2626;--high-l:#FEE2E2;
+  --font-mono:'Space Mono',monospace;
+  --font-ui:'DM Sans',sans-serif;
+  --r:6px;--r2:10px;--r3:16px;
+  --shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
+}
+[data-theme="dark"]{
+  --bg:#111110;--surface:#1C1B19;--surface2:#252420;--border:#2E2D28;--border2:#3D3B35;
+  --text:#EAE8E0;--text2:#9C9A93;--text3:#6B6860;
+}
+
+html,body{height:100%;font-family:var(--font-ui);background:var(--bg);color:var(--text);font-size:14px;line-height:1.5}
+
+/* ── Layout ───────────────────────────────────────────────────────────────── */
+.shell{display:grid;grid-template-rows:auto auto 1fr auto;height:100vh;overflow:hidden}
+.topbar{display:flex;align-items:center;gap:12px;padding:0 16px;height:48px;background:var(--surface);border-bottom:1px solid var(--border);flex-wrap:wrap}
+.logo{font-family:var(--font-mono);font-size:13px;font-weight:700;letter-spacing:.04em;white-space:nowrap}
+.logo-accent{color:var(--soil)}
+.logo-sub{font-weight:400;font-size:11px;color:var(--text2);margin-left:10px}
+.spacer{flex:1}
+.tabs{display:flex;gap:2px;background:var(--surface2);border-radius:var(--r);padding:3px}
+.tab{padding:4px 14px;border-radius:5px;border:none;background:transparent;cursor:pointer;font-size:12px;font-family:var(--font-ui);color:var(--text2);transition:all .15s;white-space:nowrap}
+.tab.active{background:var(--surface);color:var(--text);box-shadow:var(--shadow)}
+.icon-btn{width:30px;height:30px;border-radius:var(--r);border:1px solid var(--border);background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text2);font-size:14px;transition:all .15s}
+.icon-btn:hover{background:var(--surface2);color:var(--text)}
+
+.toolbar{display:flex;align-items:center;gap:10px;padding:0 16px;height:38px;background:var(--surface2);border-bottom:1px solid var(--border);overflow-x:auto;white-space:nowrap}
+.toolbar-label{font-size:11px;color:var(--text3);flex-shrink:0}
+.chip{padding:3px 10px;border-radius:20px;border:1px solid var(--border);background:transparent;font-size:11px;cursor:pointer;color:var(--text2);font-family:var(--font-ui);transition:all .15s;white-space:nowrap}
+.chip.on{background:var(--text);color:var(--bg);border-color:transparent}
+.chip:hover:not(.on){background:var(--surface);color:var(--text)}
+.mini-select{font-size:11px;padding:3px 6px;border-radius:var(--r);border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer}
+
+.body-area{display:grid;grid-template-columns:360px 1fr;overflow:hidden}
+@media(max-width:700px){.body-area{grid-template-columns:1fr;grid-template-rows:300px 1fr}}
+
+/* ── Map panel ────────────────────────────────────────────────────────────── */
+.map-panel{display:flex;flex-direction:column;border-right:1px solid var(--border);overflow:hidden}
+.panel-head{padding:8px 12px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;color:var(--text2);flex-shrink:0}
+.map-wrap{flex:1;position:relative;background:var(--surface2);overflow:hidden}
+.map-wrap svg{width:100%;height:100%;display:block}
+#map-tooltip{position:absolute;background:var(--surface);border:1px solid var(--border2);border-radius:var(--r2);padding:8px 10px;font-size:12px;pointer-events:none;opacity:0;transition:opacity .1s;z-index:20;min-width:140px;box-shadow:var(--shadow)}
+#map-tooltip strong{display:block;font-size:13px;font-weight:600;margin-bottom:4px}
+.legend-strip{display:flex;align-items:center;gap:8px;padding:6px 12px;border-top:1px solid var(--border);background:var(--surface);font-size:11px;color:var(--text2);flex-shrink:0}
+.leg-grad{height:7px;flex:1;border-radius:4px;background:linear-gradient(to right,#16a34a,#84cc16,#d97706,#ea580c,#dc2626)}
+
+/* ── Right panel ──────────────────────────────────────────────────────────── */
+.right-panel{display:flex;flex-direction:column;overflow:hidden}
+.info-scroll{flex:1;overflow-y:auto;padding:16px}
+
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:10px;color:var(--text3);text-align:center;padding:20px}
+.empty-state .ti{font-size:36px;opacity:.3}
+.empty-state strong{color:var(--text2);font-size:15px}
+
+/* ── Metrics ──────────────────────────────────────────────────────────────── */
+.country-hero{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px;gap:8px}
+.country-hero-name{font-size:20px;font-weight:600;line-height:1.2}
+.country-hero-coords{font-size:11px;font-family:var(--font-mono);color:var(--text2);margin-top:3px}
+.big-prob{font-size:32px;font-weight:700;font-family:var(--font-mono);line-height:1}
+.big-prob-sub{font-size:11px;color:var(--text3);text-align:right;margin-top:2px}
+
+.metric-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+.metric-card{background:var(--surface2);border-radius:var(--r2);padding:10px 12px;border:1px solid var(--border)}
+.metric-lbl{font-size:11px;color:var(--text2);margin-bottom:3px}
+.metric-val{font-size:17px;font-weight:600;font-family:var(--font-mono)}
+
+.narrative{background:var(--surface2);border-radius:var(--r2);padding:12px 14px;font-size:13px;line-height:1.7;color:var(--text2);margin-bottom:14px;border-left:3px solid var(--soil)}
+
+.section-label{font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.forecast-pill{font-size:10px;padding:2px 7px;border-radius:20px;background:var(--rain-l);color:var(--rain);text-transform:none;letter-spacing:0;font-weight:500}
+
+.chart-wrap{position:relative;height:190px;margin-bottom:16px}
+
+/* ── Kit compare ──────────────────────────────────────────────────────────── */
+.kit-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+.kit-card{border-radius:var(--r2);padding:10px 12px;border-left:3px solid var(--rain)}
+.kit-card.open{border-left-color:var(--soil)}
+.kit-card{background:var(--surface2);border:1px solid var(--border)}
+.kit-val{font-size:16px;font-weight:600;font-family:var(--font-mono)}
+.kit-key{font-size:11px;color:var(--text2);margin-top:2px}
+.kit-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:500}
+.kit-badge.kit{background:#dbeafe;color:#1d4ed8}
+.kit-badge.open{background:var(--sun-l);color:#92400e}
+
+/* ── Badges ───────────────────────────────────────────────────────────────── */
+.badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:500}
+.badge.low{background:var(--low-l);color:#15803d}
+.badge.mid{background:var(--mid-l);color:#b45309}
+.badge.high{background:var(--high-l);color:#b91c1c}
+
+/* ── Compare panel ────────────────────────────────────────────────────────── */
+.compare-panel{display:none;flex-direction:column;overflow:hidden;grid-column:1/-1}
+.compare-panel.visible{display:flex}
+.comp-inner{flex:1;overflow-y:auto;padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:700px){.comp-inner{grid-template-columns:1fr}}
+.comp-left,.comp-right{display:flex;flex-direction:column;gap:12px}
+.comp-controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.comp-controls select{flex:1;min-width:140px;padding:6px 8px;border-radius:var(--r);border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;font-family:var(--font-ui)}
+.add-btn{padding:6px 14px;border-radius:var(--r);border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;font-size:12px;font-family:var(--font-ui);transition:all .15s;white-space:nowrap}
+.add-btn:hover{background:var(--surface2)}
+.pills-row{display:flex;gap:6px;flex-wrap:wrap}
+.c-pill{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;background:var(--surface2);border:1px solid var(--border);font-size:11px;cursor:pointer;transition:all .15s}
+.c-pill:hover{border-color:var(--border2)}
+.c-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.comp-chart-wrap{position:relative;height:240px}
+.comp-table-wrap{overflow-x:auto}
+.comp-table{width:100%;border-collapse:collapse;font-size:12px}
+.comp-table th{text-align:left;padding:7px 10px;border-bottom:1px solid var(--border);color:var(--text2);font-weight:500;white-space:nowrap}
+.comp-table td{padding:7px 10px;border-bottom:1px solid var(--border);white-space:nowrap}
+.comp-table tr:last-child td{border-bottom:none}
+.comp-table tr:hover td{background:var(--surface2)}
+
+/* ── Zoom controls ────────────────────────────────────────────────────────── */
+.zoom-btns{position:absolute;top:8px;right:8px;display:flex;flex-direction:column;gap:3px;z-index:10}
+.z-btn{width:24px;height:24px;border-radius:4px;border:1px solid var(--border);background:var(--surface);cursor:pointer;font-size:13px;color:var(--text2);display:flex;align-items:center;justify-content:center;transition:all .15s}
+.z-btn:hover{background:var(--surface2);color:var(--text)}
+
+/* ── Bottom bar ───────────────────────────────────────────────────────────── */
+.bottombar{display:flex;align-items:center;gap:12px;padding:0 16px;height:32px;background:var(--surface);border-top:1px solid var(--border);font-size:11px;color:var(--text2);overflow:hidden;flex-shrink:0}
+.status-dot{width:6px;height:6px;border-radius:50%;background:var(--low);display:inline-block;margin-right:4px;animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* ── Loading ──────────────────────────────────────────────────────────────── */
+.loading{display:flex;align-items:center;gap:8px;justify-content:center;height:100%;color:var(--text2);font-size:12px}
+.spinner{width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--soil);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Scrollbar ────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <div class="logo">TELE<span class="logo-accent">AG</span>RICULTURE<span class="logo-sub">Soil Memory Machine</span></div>
+    <div class="spacer"></div>
+    <div class="tabs">
+      <button class="tab active" id="tab-map" onclick="switchTab('map')">
+        <i class="ti ti-map"></i> Map
+      </button>
+      <button class="tab" id="tab-compare" onclick="switchTab('compare')">
+        <i class="ti ti-chart-bar"></i> Compare
+      </button>
+    </div>
+    <button class="icon-btn" onclick="toggleTheme()" title="Toggle dark mode"><i class="ti ti-moon"></i></button>
+    <button class="icon-btn" onclick="exportCSV()" title="Export data"><i class="ti ti-download"></i></button>
+  </div>
+
+  <!-- TOOLBAR / FILTERS -->
+  <div class="toolbar">
+    <span class="toolbar-label">Show:</span>
+    <button class="chip on"  id="chip-all"      onclick="setFilter('all',this)">All years</button>
+    <button class="chip"     id="chip-recent"   onclick="setFilter('recent',this)">Last 10 yrs</button>
+    <button class="chip"     id="chip-forecast" onclick="setFilter('forecast',this)">Forecast only</button>
+    <span class="toolbar-label" style="margin-left:8px">Region:</span>
+    <select class="mini-select" id="region-sel" onchange="zoomRegion(this.value)">
+      <option value="world">World</option>
+      <option value="africa">Africa</option>
+      <option value="asia">Asia</option>
+      <option value="europe">Europe</option>
+      <option value="americas">Americas</option>
+      <option value="oceania">Oceania</option>
+    </select>
+  </div>
+
+  <!-- BODY: map + info OR compare -->
+  <div class="body-area" id="body-area">
+
+    <!-- MAP -->
+    <div class="map-panel" id="map-panel">
+      <div class="panel-head">
+        <span>Drought Risk Choropleth</span>
+        <span id="map-year" style="font-family:var(--font-mono)">2024</span>
+      </div>
+      <div class="map-wrap" id="map-wrap">
+        <div class="zoom-btns">
+          <button class="z-btn" onclick="zoomIn()" title="Zoom in">+</button>
+          <button class="z-btn" onclick="zoomOut()" title="Zoom out">−</button>
+          <button class="z-btn" onclick="resetZoom()" title="Reset" style="font-size:10px">⌂</button>
+        </div>
+        <div id="map-container" style="width:100%;height:100%"></div>
+        <div id="map-tooltip"></div>
+      </div>
+      <div class="legend-strip">
+        <span>Low</span><div class="leg-grad"></div><span>High risk</span>
+      </div>
+    </div>
+
+    <!-- INFO -->
+    <div class="right-panel" id="right-panel">
+      <div class="panel-head">
+        <span id="rp-country-name">—</span>
+        <span id="rp-badge"></span>
+      </div>
+      <div class="info-scroll" id="info-scroll">
+        <div class="empty-state" id="empty-state">
+          <i class="ti ti-map-pin"></i>
+          <strong>Click any country</strong>
+          <span>Select a country on the map to view drought intelligence, historical trends, and 2025–2027 forecasts.</span>
+        </div>
+        <div id="info-body" style="display:none"></div>
+      </div>
+    </div>
+
+    <!-- COMPARE PANEL -->
+    <div class="compare-panel" id="compare-panel">
+      <div class="panel-head">
+        <span>Global Comparison</span>
+        <span style="color:var(--text3);font-size:11px">Add up to 5 countries</span>
+      </div>
+      <div class="comp-inner">
+        <div class="comp-left">
+          <div>
+            <div class="section-label">Select countries</div>
+            <div class="comp-controls">
+              <select id="comp-sel">
+                <option value="">— choose country —</option>
+              </select>
+              <button class="add-btn" onclick="addComp()"><i class="ti ti-plus"></i> Add</button>
+            </div>
+          </div>
+          <div class="pills-row" id="comp-pills"></div>
+          <div>
+            <div class="section-label">Drought probability over time</div>
+            <div class="comp-chart-wrap">
+              <canvas id="comp-chart" role="img" aria-label="Multi-country drought probability comparison chart"></canvas>
+            </div>
+          </div>
+        </div>
+        <div class="comp-right">
+          <div>
+            <div class="section-label">Summary table</div>
+            <div class="comp-table-wrap">
+              <table class="comp-table" id="comp-table">
+                <thead><tr>
+                  <th>Country</th>
+                  <th>2024 Risk</th>
+                  <th>Avg Temp</th>
+                  <th>Avg Precip</th>
+                  <th>Trend</th>
+                  <th>2027 Forecast</th>
+                </tr></thead>
+                <tbody id="comp-tbody">
+                  <tr><td colspan="6" style="text-align:center;color:var(--text3);padding:20px">Add countries to see comparison</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div>
+            <div class="section-label">2024 Drought Probability</div>
+            <div class="comp-chart-wrap" style="height:160px">
+              <canvas id="comp-bar" role="img" aria-label="2024 drought probability bar chart by country"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- BOTTOM STATUS BAR -->
+  <div class="bottombar">
+    <span class="status-dot"></span>
+    <span>Open-Meteo archive API · RandomForest classifier</span>
+    <span style="color:var(--border2)">|</span>
+    <span id="kit-status">Kit 1001 — Togo reference node (6.14°N, 1.22°E)</span>
+    <div class="spacer"></div>
+    <span id="last-fetch" style="color:var(--text3)"></span>
+  </div>
+
+</div><!-- /.shell -->
+
+<!-- ── Libraries ─────────────────────────────────────────────────────────── -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+
+<script>
+/* ════════════════════════════════════════════════════════════════════════════
+   CONFIG — point API_BASE to your Flask server
+   ════════════════════════════════════════════════════════════════════════════ */
+const API_BASE = 'http://localhost:5000';
+
+/* ── Country registry ─────────────────────────────────────────────────────── */
+const COUNTRIES = [
+  {name:'Togo',        lat:6.14,   lon:1.22,   iso:'768', kit:true},
+  {name:'Ghana',       lat:7.95,   lon:-1.02,  iso:'288'},
+  {name:'Nigeria',     lat:9.08,   lon:8.68,   iso:'566'},
+  {name:'Kenya',       lat:-0.02,  lon:37.91,  iso:'404'},
+  {name:'Ethiopia',    lat:9.15,   lon:40.49,  iso:'231'},
+  {name:'South Africa',lat:-28.5,  lon:24.68,  iso:'710'},
+  {name:'Egypt',       lat:26.82,  lon:30.80,  iso:'818'},
+  {name:'Morocco',     lat:31.79,  lon:-7.09,  iso:'504'},
+  {name:'Mali',        lat:17.57,  lon:-3.99,  iso:'466'},
+  {name:'Niger',       lat:17.61,  lon:8.08,   iso:'562'},
+  {name:'Senegal',     lat:14.50,  lon:-14.45, iso:'686'},
+  {name:'Tanzania',    lat:-6.37,  lon:34.89,  iso:'834'},
+  {name:'Mozambique',  lat:-18.67, lon:35.53,  iso:'508'},
+  {name:'Zimbabwe',    lat:-19.02, lon:29.15,  iso:'716'},
+  {name:'Sudan',       lat:12.86,  lon:30.22,  iso:'729'},
+  {name:'Chad',        lat:15.45,  lon:18.73,  iso:'148'},
+  {name:'India',       lat:20.59,  lon:78.96,  iso:'356'},
+  {name:'Pakistan',    lat:30.38,  lon:69.35,  iso:'586'},
+  {name:'Afghanistan', lat:33.94,  lon:67.71,  iso:'004'},
+  {name:'Iran',        lat:32.43,  lon:53.69,  iso:'364'},
+  {name:'Iraq',        lat:33.22,  lon:43.68,  iso:'368'},
+  {name:'Saudi Arabia',lat:23.89,  lon:45.08,  iso:'682'},
+  {name:'Yemen',       lat:15.55,  lon:48.52,  iso:'887'},
+  {name:'Syria',       lat:34.80,  lon:39.06,  iso:'760'},
+  {name:'Turkey',      lat:38.96,  lon:35.24,  iso:'792'},
+  {name:'Australia',   lat:-25.27, lon:133.78, iso:'036'},
+  {name:'Brazil',      lat:-14.24, lon:-51.93, iso:'076'},
+  {name:'Argentina',   lat:-38.42, lon:-63.62, iso:'032'},
+  {name:'Mexico',      lat:23.63,  lon:-102.55,iso:'484'},
+  {name:'USA',         lat:37.09,  lon:-95.71, iso:'840'},
+  {name:'Spain',       lat:40.46,  lon:-3.75,  iso:'724'},
+  {name:'Italy',       lat:41.87,  lon:12.57,  iso:'380'},
+  {name:'Greece',      lat:39.07,  lon:21.82,  iso:'300'},
+  {name:'Portugal',    lat:39.40,  lon:-8.22,  iso:'620'},
+  {name:'France',      lat:46.23,  lon:2.21,   iso:'250'},
+  {name:'China',       lat:35.86,  lon:104.20, iso:'156'},
+  {name:'Mongolia',    lat:46.86,  lon:103.85, iso:'496'},
+  {name:'Kazakhstan',  lat:48.02,  lon:66.92,  iso:'398'},
+  {name:'Uzbekistan',  lat:41.38,  lon:64.59,  iso:'860'},
+  {name:'Namibia',     lat:-22.96, lon:18.49,  iso:'516'},
+  {name:'Botswana',    lat:-22.33, lon:24.68,  iso:'072'},
+  {name:'Angola',      lat:-11.20, lon:17.87,  iso:'024'},
+  {name:'Somalia',     lat:5.15,   lon:46.20,  iso:'706'},
+  {name:'Libya',       lat:26.34,  lon:17.23,  iso:'434'},
+  {name:'Algeria',     lat:28.03,  lon:1.66,   iso:'012'},
+  {name:'Tunisia',     lat:33.89,  lon:9.54,   iso:'788'},
+  {name:'Peru',        lat:-9.19,  lon:-75.02, iso:'604'},
+  {name:'Chile',       lat:-35.68, lon:-71.54, iso:'152'},
+  {name:'Bolivia',     lat:-16.29, lon:-63.59, iso:'068'},
+  {name:'Colombia',    lat:4.57,   lon:-74.30, iso:'170'},
+  {name:'Germany',     lat:51.17,  lon:10.45,  iso:'276'},
+  {name:'UK',          lat:55.38,  lon:-3.44,  iso:'826'},
+  {name:'Sweden',      lat:60.13,  lon:18.64,  iso:'752'},
+  {name:'Ukraine',     lat:48.38,  lon:31.17,  iso:'804'},
+  {name:'Indonesia',   lat:-0.79,  lon:113.92, iso:'360'},
+  {name:'Philippines', lat:12.88,  lon:121.77, iso:'608'},
+  {name:'Vietnam',     lat:14.06,  lon:108.28, iso:'704'},
+  {name:'Myanmar',     lat:21.90,  lon:95.96,  iso:'104'},
+  {name:'Zimbabwe',    lat:-19.02, lon:29.15,  iso:'716'},
+];
+
+const isoMap = {};
+COUNTRIES.forEach(c => isoMap[c.iso] = c);
+
+/* ── Seeded RNG for offline demo data ─────────────────────────────────────── */
+function seeded(seed) {
+  let s = ((seed % 2147483647) + 2147483647) % 2147483647 || 1;
+  return () => { s = s * 16807 % 2147483647; return (s - 1) / 2147483646; };
+}
+
+function mockData(c) {
+  const r    = seeded(Math.round(c.lat * 1000 + c.lon * 100 + c.name.charCodeAt(0)));
+  const arid = (Math.abs(c.lat) > 18 && Math.abs(c.lat) < 35) ? 0.28 : 0;
+  const trop = Math.abs(c.lat) < 8 ? -0.08 : 0;
+  const base = 0.25 + arid + trop + (r() * 0.2 - 0.1);
+  const trendRate = r() * 0.35 - 0.08;
+
+  const history = [];
+  for (let y = 1990; y <= 2027; y++) {
+    const isForecast = y > 2024;
+    const t    = (y - 1990) / 35;
+    const prob = Math.min(95, Math.max(5, Math.round((base + trendRate * t + r() * 0.28 - 0.14) * 100)));
+    const precip = Math.round(Math.max(12, 620 - base * 720 + r() * 210));
+    const temp   = parseFloat((18 + Math.abs(c.lat) * 0.28 + base * 13 + r() * 3).toFixed(1));
+    history.push({ year: y, drought_prob: prob, precip, temp, drought: prob > 50 ? 1 : 0, forecast: isForecast });
+  }
+
+  const recent5  = history.filter(h => !h.forecast).slice(-5);
+  const early5   = history.slice(0, 5);
+  const avgTemp  = parseFloat((recent5.reduce((s, h) => s + h.temp,  0) / 5).toFixed(1));
+  const avgPrec  = Math.round(recent5.reduce((s, h) => s + h.precip, 0) / 5);
+  const curProb  = history.find(h => h.year === 2024)?.drought_prob ?? 50;
+  const trend    = parseFloat((curProb - early5.reduce((s, h) => s + h.drought_prob, 0) / 5).toFixed(1));
+
+  const narrative = buildNarrative(c.name, avgTemp, avgPrec, trend, curProb);
+  return { country: c.name, lat: c.lat, lon: c.lon, current_prob: curProb,
+           avg_temp: avgTemp, avg_precip: avgPrec, trend, narrative, history };
+}
+
+/* ── Narrative builder (mirrors backend logic) ───────────────────────────── */
+function buildNarrative(name, avgTemp, avgPrec, trend, prob) {
+  const rain  = avgPrec < 200 ? `Annual rainfall critically low at ${avgPrec}mm.`
+              : avgPrec < 600 ? `Below-average rainfall at ${avgPrec}mm per year.`
+              : `Relatively stable rainfall at ${avgPrec}mm annually.`;
+  const temp  = avgTemp > 35 ? `Extreme temperatures at ${avgTemp}°C accelerate moisture loss.`
+              : avgTemp > 28 ? `Elevated temperatures at ${avgTemp}°C increase evaporative stress.`
+              : `Temperatures average ${avgTemp}°C — within a moderate range.`;
+  const trendS = trend > 3  ? 'Drought conditions have worsened significantly over the historical record.'
+               : trend < -3 ? 'Conditions have improved with declining drought pressure.'
+               : 'Drought patterns have remained broadly stable across the recorded period.';
+  const risk   = prob >= 60 ? 'high' : prob >= 35 ? 'moderate' : 'low';
+  return `${rain} ${temp} ${trendS} ML model rates drought probability at ${prob}% (${risk} risk).`;
+}
+
+/* ── Risk colour ──────────────────────────────────────────────────────────── */
+function riskColor(p) {
+  return p < 30 ? '#16a34a' : p < 50 ? '#84cc16' : p < 65 ? '#d97706' : p < 80 ? '#ea580c' : '#dc2626';
+}
+
+/* ── State ────────────────────────────────────────────────────────────────── */
+let currentTab    = 'map';
+let filterMode    = 'all';
+let selectedData  = null;
+let detailChart   = null;
+let compLineChart = null;
+let compBarChart  = null;
+let compCountries = [];
+let dataCache     = {};
+const COMP_COLORS = ['#2563eb','#d97706','#16a34a','#dc2626','#7c3aed'];
+
+/* ── Data fetching (real API → offline fallback) ─────────────────────────── */
+async function fetchData(country) {
+  const key = country.name;
+  if (dataCache[key]) return dataCache[key];
+
+  try {
+    const url = `${API_BASE}/predict?lat=${country.lat}&lon=${country.lon}&name=${encodeURIComponent(country.name)}`;
+    const r   = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (!r.ok) throw new Error('API error');
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    dataCache[key] = d;
+    document.getElementById('last-fetch').textContent = `Live data · ${new Date().toLocaleTimeString()}`;
+    return d;
+  } catch {
+    const d = mockData(country);
+    dataCache[key] = d;
+    document.getElementById('last-fetch').textContent = 'Offline demo data';
+    return d;
+  }
+}
+
+/* ── D3 World Map ─────────────────────────────────────────────────────────── */
+let svgMap, mapG, projection, geoPath, zoomBeh;
+
+const REGION_ZOOM = {
+  world:    { s:1.0,  tx:0,    ty:0    },
+  africa:   { s:2.4,  tx:-80,  ty:20   },
+  asia:     { s:1.8,  tx:-200, ty:30   },
+  europe:   { s:4.2,  tx:-420, ty:230  },
+  americas: { s:1.5,  tx:260,  ty:10   },
+  oceania:  { s:2.5,  tx:-420, ty:-60  },
+};
+
+function initMap() {
+  const wrap = document.getElementById('map-container');
+  const W = wrap.offsetWidth || 360, H = wrap.offsetHeight || 300;
+
+  projection = d3.geoNaturalEarth1().scale(100).translate([W / 2, H / 2]);
+  geoPath    = d3.geoPath(projection);
+
+  svgMap = d3.select('#map-container').append('svg')
+    .attr('width', '100%').attr('height', '100%')
+    .attr('viewBox', `0 0 ${W} ${H}`)
+    .style('cursor', 'grab');
+
+  mapG = svgMap.append('g');
+
+  // Graticule
+  mapG.append('path')
+    .datum(d3.geoGraticule()())
+    .attr('fill', 'none').attr('stroke', '#ccc').attr('stroke-width', 0.2)
+    .attr('d', geoPath).attr('opacity', 0.4);
+
+  zoomBeh = d3.zoom().scaleExtent([0.5, 12])
+    .on('zoom', e => { mapG.attr('transform', e.transform); svgMap.style('cursor','grabbing'); })
+    .on('end',  () => svgMap.style('cursor','grab'));
+  svgMap.call(zoomBeh);
+
+  const tooltip = document.getElementById('map-tooltip');
+
+  d3.json('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json').then(world => {
+    const features = topojson.feature(world, world.objects.countries).features;
+
+    mapG.selectAll('path.country')
+      .data(features).join('path').attr('class','country')
+      .attr('d', geoPath)
+      .attr('stroke', '#fff').attr('stroke-width', 0.3)
+      .style('cursor', 'pointer')
+      .attr('fill', d => {
+        const c = isoMap[String(d.id).padStart(3,'0')];
+        return c ? riskColor(mockData(c).current_prob) : '#ddd';
+      })
+      .on('mousemove', (ev, d) => {
+        const c = isoMap[String(d.id).padStart(3,'0')];
+        if (!c) { tooltip.style.opacity = 0; return; }
+        const dat  = mockData(c);
+        const risk = dat.current_prob >= 70 ? 'high' : dat.current_prob >= 40 ? 'mid' : 'low';
+        const rl   = dat.current_prob >= 70 ? 'High risk' : dat.current_prob >= 40 ? 'Moderate' : 'Low risk';
+        tooltip.innerHTML = `<strong>${c.name}${c.kit?' <small style="color:#2563eb">Kit 1001</small>':''}</strong>
+          <span class="badge ${risk}">${rl}</span>
+          <div style="margin-top:4px;font-size:11px;color:var(--text2)">
+            Drought probability: <b>${dat.current_prob}%</b><br>
+            Avg temp: ${dat.avg_temp}°C &nbsp;·&nbsp; Precip: ${dat.avg_precip}mm
+          </div>`;
+        const wr = document.getElementById('map-wrap').getBoundingClientRect();
+        tooltip.style.left  = (ev.clientX - wr.left + 12) + 'px';
+        tooltip.style.top   = (ev.clientY - wr.top  - 10) + 'px';
+        tooltip.style.opacity = '1';
+      })
+      .on('mouseleave', () => tooltip.style.opacity = '0')
+      .on('click', (ev, d) => {
+        const c = isoMap[String(d.id).padStart(3,'0')];
+        if (!c) return;
+        if (currentTab === 'map') {
+          mapG.selectAll('path.country').attr('stroke','#fff').attr('stroke-width',0.3);
+          d3.select(ev.currentTarget).attr('stroke','#1e293b').attr('stroke-width',1.8);
+          loadCountry(c);
+        }
+      });
+
+    // Populate compare dropdown
+    const sel = document.getElementById('comp-sel');
+    COUNTRIES.slice().sort((a,b)=>a.name.localeCompare(b.name)).forEach(c => {
+      const o = document.createElement('option'); o.value = c.name; o.textContent = c.name; sel.appendChild(o);
+    });
+
+    // Pre-select Togo
+    const togo = COUNTRIES.find(c => c.kit);
+    if (togo) loadCountry(togo);
+
+  }).catch(() => {
+    document.getElementById('map-container').innerHTML =
+      '<div style="padding:20px;color:var(--text2);font-size:12px">Map tiles unavailable — check network.</div>';
+  });
+}
+
+function zoomRegion(reg) {
+  const rv = REGION_ZOOM[reg] || REGION_ZOOM.world;
+  const wrap = document.getElementById('map-container');
+  const W = wrap.offsetWidth || 360, H = wrap.offsetHeight || 300;
+  const t = d3.zoomIdentity
+    .translate(W/2 + rv.tx * rv.s, H/2 + rv.ty * rv.s)
+    .scale(rv.s);
+  svgMap.transition().duration(600).call(zoomBeh.transform, t);
+}
+function zoomIn()    { svgMap.transition().duration(280).call(zoomBeh.scaleBy, 1.6); }
+function zoomOut()   { svgMap.transition().duration(280).call(zoomBeh.scaleBy, 0.63); }
+function resetZoom() { svgMap.transition().duration(400).call(zoomBeh.transform, d3.zoomIdentity); }
+
+/* ── Country info panel ───────────────────────────────────────────────────── */
+async function loadCountry(c) {
+  document.getElementById('rp-country-name').textContent = c.name;
+  document.getElementById('rp-badge').innerHTML = '';
+  document.getElementById('empty-state').style.display = 'none';
+  document.getElementById('info-body').style.display = 'block';
+  document.getElementById('info-body').innerHTML = '<div class="loading"><div class="spinner"></div>Loading…</div>';
+
+  const d = await fetchData(c);
+  selectedData = d;
+  renderInfo(d);
+}
+
+function filteredHistory(history) {
+  if (filterMode === 'recent')   return history.filter(h => h.year >= 2015 && !h.forecast);
+  if (filterMode === 'forecast') return history.filter(h => h.forecast);
+  return history;
+}
+
+function renderInfo(d) {
+  const risk  = d.current_prob >= 70 ? 'high' : d.current_prob >= 40 ? 'mid' : 'low';
+  const riskL = d.current_prob >= 70 ? 'High Risk' : d.current_prob >= 40 ? 'Moderate' : 'Low Risk';
+  const trendDir = d.trend > 3 ? '↑ Worsening' : d.trend < -3 ? '↓ Improving' : '→ Stable';
+  const trendCol = d.trend > 3 ? 'var(--high)' : d.trend < -3 ? 'var(--low)' : 'var(--text2)';
+
+  document.getElementById('rp-country-name').textContent = d.country;
+  document.getElementById('rp-badge').innerHTML = `<span class="badge ${risk}">${riskL}</span>`;
+
+  document.getElementById('info-body').innerHTML = `
+    <div class="country-hero">
+      <div>
+        <div class="country-hero-name">${d.country}${COUNTRIES.find(c=>c.name===d.country)?.kit ? ' <span style="font-size:12px;font-weight:400;color:var(--rain);font-family:var(--font-ui)">Kit 1001</span>':''}</div>
+        <div class="country-hero-coords">${d.lat.toFixed(2)}° N &nbsp; ${d.lon.toFixed(2)}° E</div>
+      </div>
+      <div style="text-align:right">
+        <div class="big-prob" style="color:${riskColor(d.current_prob)}">${d.current_prob}%</div>
+        <div class="big-prob-sub">2024 drought prob.</div>
+      </div>
+    </div>
+
+    <div class="metric-grid">
+      <div class="metric-card"><div class="metric-lbl">Avg temp</div><div class="metric-val">${d.avg_temp}°C</div></div>
+      <div class="metric-card"><div class="metric-lbl">Avg precip</div><div class="metric-val">${d.avg_precip}<span style="font-size:12px;font-weight:400">mm</span></div></div>
+      <div class="metric-card"><div class="metric-lbl">Trend</div><div class="metric-val" style="font-size:13px;color:${trendCol}">${trendDir}</div></div>
+    </div>
+
+    <div class="narrative">${d.narrative}</div>
+
+    <div class="section-label">
+      Historical &amp; Forecast
+      <span class="forecast-pill">2025–2027 ML forecast</span>
+    </div>
+    <div class="chart-wrap"><canvas id="detail-chart" role="img" aria-label="Drought probability for ${d.country}"></canvas></div>
+
+    ${COUNTRIES.find(c=>c.name===d.country)?.kit ? `
+    <div class="section-label" style="margin-top:4px"><i class="ti ti-cpu" style="font-size:13px"></i>&nbsp; Kit 1001 vs Open-Meteo</div>
+    <div class="kit-grid">
+      <div class="kit-card" style="border-left:3px solid var(--rain)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+          <span class="kit-badge kit">Kit 1001</span></div>
+        <div class="kit-val">29.4°C</div><div class="kit-key">Current temperature</div></div>
+      <div class="kit-card" style="border-left:3px solid var(--soil)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+          <span class="kit-badge open">Open-Meteo</span></div>
+        <div class="kit-val">${d.avg_temp}°C</div><div class="kit-key">Historical avg</div></div>
+      <div class="kit-card" style="border-left:3px solid var(--rain)">
+        <span class="kit-badge kit" style="margin-bottom:4px;display:inline-flex">Kit 1001</span>
+        <div class="kit-val">1.2mm</div><div class="kit-key">Last 7-day precip</div></div>
+      <div class="kit-card" style="border-left:3px solid var(--soil)">
+        <span class="kit-badge open" style="margin-bottom:4px;display:inline-flex">Open-Meteo</span>
+        <div class="kit-val">${Math.round(d.avg_precip/52)}mm</div><div class="kit-key">Weekly avg precip</div></div>
+    </div>` : ''}
+  `;
+
+  renderDetailChart(d);
+}
+
+function renderDetailChart(d) {
+  if (detailChart) { detailChart.destroy(); detailChart = null; }
+  const h   = filteredHistory(d.history);
+  const ctx = document.getElementById('detail-chart');
+  if (!ctx) return;
+
+  detailChart = new Chart(ctx, {
+    data: {
+      labels: h.map(r => r.year),
+      datasets: [
+        {
+          type: 'bar', label: 'Drought probability %',
+          data: h.map(r => r.drought_prob),
+          backgroundColor: h.map(r => r.forecast ? 'rgba(37,99,235,.5)' : riskColor(r.drought_prob) + 'bb'),
+          borderColor:     h.map(r => r.forecast ? '#2563eb'            : riskColor(r.drought_prob)),
+          borderWidth: 1, borderRadius: 2, yAxisID: 'y',
+        },
+        {
+          type: 'line', label: 'Precipitation index',
+          data: h.map(r => Math.min(100, Math.round(r.precip / 10))),
+          borderColor: '#93c5fd', borderWidth: 1.5, pointRadius: 0,
+          tension: 0.4, borderDash: [4,3], fill: false, yAxisID: 'y',
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y}${ctx.dataset.label.includes('%')?'%':''}` } }
+      },
+      scales: {
+        x: { ticks: { font:{size:10}, maxRotation:45, autoSkip:true, maxTicksLimit:12 }, grid: {display:false} },
+        y: { min:0, max:100, ticks: { font:{size:10}, callback: v=>v+'%' }, grid: { color:'rgba(0,0,0,.06)' } }
+      }
+    }
+  });
+}
+
+/* ── Filters ──────────────────────────────────────────────────────────────── */
+function setFilter(mode, btn) {
+  filterMode = mode;
+  document.querySelectorAll('.chip').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  if (selectedData) renderDetailChart(selectedData);
+  if (compCountries.length >= 2) renderCompCharts();
+}
+
+/* ── Tab switching ────────────────────────────────────────────────────────── */
+function switchTab(tab) {
+  currentTab = tab;
+  document.getElementById('tab-map').classList.toggle('active', tab==='map');
+  document.getElementById('tab-compare').classList.toggle('active', tab==='compare');
+  document.getElementById('map-panel').style.display    = tab==='map' ? '' : 'none';
+  document.getElementById('right-panel').style.display  = tab==='map' ? '' : 'none';
+  document.getElementById('compare-panel').classList.toggle('visible', tab==='compare');
+}
+
+/* ── Compare ──────────────────────────────────────────────────────────────── */
+async function addComp() {
+  const sel  = document.getElementById('comp-sel');
+  const name = sel.value; if (!name) return;
+  if (compCountries.find(c=>c.name===name)) return;
+  if (compCountries.length >= 5) return;
+  const c = COUNTRIES.find(x=>x.name===name); if (!c) return;
+  compCountries.push(c);
+  renderCompPills();
+  await Promise.all(compCountries.map(fetchData));
+  renderCompCharts();
+}
+
+function removeComp(name) {
+  compCountries = compCountries.filter(c=>c.name!==name);
+  renderCompPills();
+  if (compCountries.length >= 2) renderCompCharts(); else clearCompCharts();
+}
+
+function renderCompPills() {
+  document.getElementById('comp-pills').innerHTML = compCountries.map((c,i) =>
+    `<span class="c-pill" onclick="removeComp('${c.name}')">
+      <span class="c-dot" style="background:${COMP_COLORS[i%5]}"></span>${c.name}&nbsp;<small>✕</small>
+    </span>`
+  ).join('');
+}
+
+function clearCompCharts() {
+  if (compLineChart) { compLineChart.destroy(); compLineChart=null; }
+  if (compBarChart)  { compBarChart.destroy();  compBarChart=null;  }
+  document.getElementById('comp-tbody').innerHTML =
+    '<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:20px">Add countries to see comparison</td></tr>';
+}
+
+function renderCompCharts() {
+  if (compLineChart) { compLineChart.destroy(); compLineChart=null; }
+  if (compBarChart)  { compBarChart.destroy();  compBarChart=null;  }
+
+  const allData = compCountries.map(c => dataCache[c.name] || mockData(c));
+  const allYears = [...new Set(allData.flatMap(d =>
+    filteredHistory(d.history).map(h=>h.year)
+  ))].sort((a,b)=>a-b);
+
+  // Line chart
+  const lineCtx = document.getElementById('comp-chart');
+  if (lineCtx) {
+    compLineChart = new Chart(lineCtx, {
+      type: 'line',
+      data: {
+        labels: allYears,
+        datasets: allData.map((d,i) => ({
+          label: d.country,
+          data: allYears.map(y => filteredHistory(d.history).find(h=>h.year===y)?.drought_prob ?? null),
+          borderColor: COMP_COLORS[i%5], borderWidth: 2, pointRadius: 2,
+          tension: 0.3, fill: false, spanGaps: true,
+        }))
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{ display:false } },
+        scales:{
+          x:{ticks:{font:{size:10},maxRotation:45,autoSkip:true,maxTicksLimit:14},grid:{display:false}},
+          y:{min:0,max:100,ticks:{font:{size:10},callback:v=>v+'%'},grid:{color:'rgba(0,0,0,.06)'}}
+        }
+      }
+    });
+  }
+
+  // Bar chart
+  const barCtx = document.getElementById('comp-bar');
+  if (barCtx) {
+    compBarChart = new Chart(barCtx, {
+      type: 'bar',
+      data: {
+        labels: allData.map(d=>d.country),
+        datasets:[{
+          label:'2024 Drought probability %',
+          data: allData.map(d=>d.current_prob),
+          backgroundColor: allData.map((d,i)=>COMP_COLORS[i%5]+'bb'),
+          borderColor:     allData.map((d,i)=>COMP_COLORS[i%5]),
+          borderWidth:1, borderRadius:3,
+        }]
+      },
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false}},
+        scales:{
+          x:{ticks:{font:{size:10}},grid:{display:false}},
+          y:{min:0,max:100,ticks:{font:{size:10},callback:v=>v+'%'},grid:{color:'rgba(0,0,0,.06)'}}
+        }
+      }
+    });
+  }
+
+  // Table
+  document.getElementById('comp-tbody').innerHTML = allData.map((d,i) => {
+    const risk  = d.current_prob>=70?'high':d.current_prob>=40?'mid':'low';
+    const f27   = d.history.find(h=>h.year===2027)?.drought_prob??'—';
+    const tCol  = d.trend>3?'var(--high)':d.trend<-3?'var(--low)':'var(--text2)';
+    const tSign = d.trend>0?'+':'';
+    return `<tr>
+      <td style="font-weight:500">
+        <span class="c-dot" style="background:${COMP_COLORS[i%5]};display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px"></span>${d.country}</td>
+      <td><span class="badge ${risk}">${d.current_prob}%</span></td>
+      <td>${d.avg_temp}°C</td>
+      <td>${d.avg_precip}mm</td>
+      <td style="color:${tCol}">${tSign}${d.trend}%</td>
+      <td style="font-family:var(--font-mono);font-size:12px">${f27}%</td>
+    </tr>`;
+  }).join('');
+}
+
+/* ── Theme toggle ─────────────────────────────────────────────────────────── */
+function toggleTheme() {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  document.documentElement.setAttribute('data-theme', isDark ? 'light' : 'dark');
+}
+
+/* ── CSV export ───────────────────────────────────────────────────────────── */
+function exportCSV() {
+  if (!selectedData) return alert('Select a country first');
+  const d   = selectedData;
+  const rows = [['Year','Drought Prob %','Precipitation mm','Temp °C','Is Forecast']];
+  d.history.forEach(h => rows.push([h.year, h.drought_prob, h.precip, h.temp, h.forecast?'Yes':'No']));
+  const csv  = rows.map(r=>r.join(',')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const a    = document.createElement('a');
+  a.href     = URL.createObjectURL(blob);
+  a.download = `${d.country.replace(/ /g,'_')}_drought_data.csv`;
+  a.click();
+}
+
+/* ── Boot ─────────────────────────────────────────────────────────────────── */
+window.addEventListener('load', () => {
+  initMap();
+  document.getElementById('last-fetch').textContent = new Date().toLocaleDateString();
+});
+</script>
+</body>
+</html>
