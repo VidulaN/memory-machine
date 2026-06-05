@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Teleagriculture — Soil Memory Machine
 
 A precision drought intelligence platform combining satellite-era climate archives,
@@ -204,3 +205,6 @@ The frontend `Kit 1001` panel will automatically show live values once the
 | gunicorn      | 22.0.0  | Production WSGI server       |
 
 Frontend uses CDN-delivered D3 v7, TopoJSON v3, and Chart.js v4 — no npm needed.
+=======
+# memory-machine
+>>>>>>> 3071915d9c48c59736474998dc0d94bf6c22556f
