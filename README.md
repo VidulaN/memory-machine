@@ -1,111 +1,101 @@
-<<<<<<< HEAD
 # Teleagriculture — Soil Memory Machine
 
-A precision drought intelligence platform combining satellite-era climate archives,
-machine learning, and real-time IoT kit data for agricultural decision-making.
+Pulls satellite-era climate archives and runs them through a RandomForest to flag drought risk, year by year. Pair it with a cheap IoT soil kit and you get a side-by-side view of what the sensors are saying vs what the historical record would predict.
+
+Built this mostly for smallholder farming contexts in West Africa but the API takes any lat/lon so it works anywhere.
 
 ---
 
-## Project structure
+## What's in here
 
 ```
 teleagriculture/
 ├── backend/
-│   ├── app.py                  # Flask REST API
-│   ├── build_dataset.py        # Fetch + engineer training data
-│   ├── train_model.py          # Train & evaluate RandomForest
-│   ├── predict_live.py         # CLI daily report (cron-friendly)
+│   ├── app.py                  # Flask API
+│   ├── build_dataset.py        # pulls + engineers training data
+│   ├── train_model.py          # trains the RandomForest, prints eval
+│   ├── predict_live.py         # daily CLI report, good for cron
 │   ├── requirements.txt
-│   ├── data/                   # dataset.csv goes here
-│   ├── model/                  # drought_model.pkl goes here
+│   ├── data/                   # dataset.csv lives here
+│   ├── model/                  # drought_model.pkl lives here
 │   └── narrative/
 │       ├── __init__.py
-│       └── generate.py         # Narrative text generation
+│       └── generate.py
 └── frontend/
-    └── index.html              # Self-contained dashboard (no build step)
+    └── index.html              # single file, no build step needed
 ```
 
 ---
 
-## Quick start
+## Getting started
 
-### 1 — Install Python dependencies
+### 1. Python deps
 
 ```bash
 cd backend
 python -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
+source .venv/bin/activate       # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 2 — Build the training dataset
+### 2. Build the training data
 
-Fetches daily Open-Meteo data for the Togo Kit 1001 reference node by default.
-You can pass `--lat`, `--lon`, `--start`, `--end` to use a different location.
+Defaults to the Togo Kit 1001 reference node. Pass `--lat`, `--lon`, `--start`, `--end` to change location.
 
 ```bash
 python build_dataset.py
-# Saved to data/dataset.csv
+# saves to data/dataset.csv
 ```
 
-To build a multi-region dataset, run the script several times with different
-coordinates and concatenate the CSVs:
+For multiple regions, run it a few times and concat:
 
 ```bash
 python build_dataset.py --lat 7.95 --lon -1.02 --out data/ghana.csv
 cat data/dataset.csv data/ghana.csv > data/combined.csv
 ```
 
-### 3 — Train the model
+### 3. Train
 
 ```bash
 python train_model.py --data data/dataset.csv --out model/drought_model.pkl
 ```
 
-You will see a classification report, confusion matrix, ROC-AUC score,
-5-fold cross-validation results, and feature importances printed to stdout.
+Prints a classification report, confusion matrix, ROC-AUC, 5-fold CV results, and feature importances.
 
-### 4 — Start the API server
+### 4. Run the API
 
 ```bash
 python app.py
-# Running on http://localhost:5000
+# http://localhost:5000
 ```
 
-Or with Gunicorn for production:
-
+Production:
 ```bash
 gunicorn -w 4 -b 0.0.0.0:5000 app:app
 ```
 
-### 5 — Open the dashboard
+### 5. Open the dashboard
 
-Open `frontend/index.html` directly in your browser (no build step needed).
-
-If the Flask API is not reachable the dashboard automatically falls back to
-offline demo data so the UI is always functional.
+Just open `frontend/index.html` in a browser — no build step, no npm. If the Flask API isn't running it falls back to offline demo data automatically.
 
 ---
 
-## API reference
+## API
 
 ### `GET /predict`
 
-Fetch historical climate data, run the ML model year-by-year, and return
-2025–2027 forecasts.
+Fetches historical climate data, runs the model year-by-year, and returns forecasts up to 2027.
 
-| Parameter | Type   | Required | Description               |
-|-----------|--------|----------|---------------------------|
-| `lat`     | float  | ✓        | Latitude                  |
-| `lon`     | float  | ✓        | Longitude                 |
-| `name`    | string |          | Display name (default: "this location") |
+| param | type | required | notes |
+|-------|------|----------|-------|
+| `lat` | float | yes | |
+| `lon` | float | yes | |
+| `name` | string | no | defaults to "this location" |
 
-**Example:**
 ```
 GET /predict?lat=6.14&lon=1.22&name=Togo
 ```
 
-**Response:**
 ```json
 {
   "country":      "Togo",
@@ -126,85 +116,73 @@ GET /predict?lat=6.14&lon=1.22&name=Togo
 
 ### `GET /recent`
 
-Returns the last 60-day climate snapshot for Kit vs Open-Data comparison.
+Last 60 days of climate data — used for the kit vs open-data comparison panel.
 
-| Parameter | Type  | Required |
-|-----------|-------|----------|
-| `lat`     | float | ✓        |
-| `lon`     | float | ✓        |
+Params: `lat`, `lon` (both required).
 
 ### `GET /health`
 
-Returns `{"status":"ok", "model":"RandomForest drought classifier", "kit_node":"..."}`.
+```json
+{"status":"ok", "model":"RandomForest drought classifier", "kit_node":"..."}
+```
 
 ---
 
-## Daily live report (cron)
-
-Run `predict_live.py` as a scheduled job to get a daily printed narrative:
+## Running as a daily cron job
 
 ```bash
 python predict_live.py --lat 6.14 --lon 1.22 --name Togo
 ```
 
-Add to crontab (runs every morning at 07:00):
-```cron
+Crontab example (runs at 07:00):
+```
 0 7 * * * /path/to/.venv/bin/python /path/to/backend/predict_live.py >> /var/log/soil_memory.log 2>&1
 ```
 
 ---
 
-## Dashboard features
+## Dashboard
 
-| Feature | Description |
-|---------|-------------|
-| **Choropleth map** | 50+ countries colour-coded green → red by 2024 drought probability |
-| **Click-to-analyse** | Select any country to load full historical + forecast data |
-| **Kit 1001 panel** | Side-by-side comparison of Kit sensor readings vs Open-Meteo archive |
-| **Filters** | All years / Last 10 years / Forecast only — applied to all charts |
-| **Region zoom** | Snap to Africa, Asia, Europe, Americas, Oceania |
-| **Compare tab** | Add up to 5 countries, view shared time-series + summary table |
-| **CSV export** | Download the selected country's full dataset |
-| **Dark mode** | Toggle via the moon button in the top bar |
-| **Offline fallback** | Works without the Flask API using deterministic demo data |
+| thing | what it does |
+|-------|-------------|
+| choropleth map | 50+ countries, green → red by 2024 drought probability |
+| click to analyse | click any country to load its full history + forecast |
+| Kit 1001 panel | kit sensor readings next to Open-Meteo archive data |
+| filters | all years / last 10 / forecast only |
+| region zoom | Africa, Asia, Europe, Americas, Oceania |
+| compare tab | up to 5 countries, shared time-series + summary table |
+| CSV export | download the full dataset for the selected country |
+| dark mode | moon button in the top bar |
+| offline fallback | works without the API using deterministic demo data |
 
 ---
 
 ## Connecting a real IoT kit
 
-The `/recent` endpoint is designed as the data bridge. In your kit firmware,
-POST sensor readings to a thin ingestion service that writes them into a small
-SQLite or PostgreSQL table. Then modify `fetch_recent()` in `app.py` to read
-from that table instead of (or alongside) the Open-Meteo call.
-
-The frontend `Kit 1001` panel will automatically show live values once the
-`/recent` endpoint returns real sensor data.
+The `/recent` endpoint is the bridge. Have your kit firmware POST sensor readings to a small ingestion service that writes to SQLite or Postgres, then update `fetch_recent()` in `app.py` to read from that table. The Kit 1001 panel will pick it up automatically.
 
 ---
 
-## Environment variables
+## Env vars
 
-| Variable     | Default                 | Description                        |
-|--------------|-------------------------|------------------------------------|
-| `FLASK_ENV`  | `production`            | Set to `development` for hot-reload |
-| `PORT`       | `5000`                  | API port                           |
-| `MODEL_PATH` | `model/drought_model.pkl` | Path to the trained model          |
+| var | default | |
+|-----|---------|--|
+| `FLASK_ENV` | `production` | set to `development` for hot-reload |
+| `PORT` | `5000` | |
+| `MODEL_PATH` | `model/drought_model.pkl` | |
 
 ---
 
 ## Dependencies
 
-| Package       | Version | Purpose                      |
-|---------------|---------|------------------------------|
-| flask         | 3.0.3   | REST API framework           |
-| flask-cors    | 4.0.1   | Cross-origin requests        |
-| pandas        | 2.2.2   | Data wrangling               |
-| scikit-learn  | 1.5.0   | RandomForest classifier      |
-| requests      | 2.32.3  | Open-Meteo HTTP client       |
-| numpy         | 1.26.4  | Numerical operations         |
-| gunicorn      | 22.0.0  | Production WSGI server       |
+```
+flask==3.0.3
+flask-cors==4.0.1
+pandas==2.2.2
+scikit-learn==1.5.0
+requests==2.32.3
+numpy==1.26.4
+gunicorn==22.0.0
+```
 
-Frontend uses CDN-delivered D3 v7, TopoJSON v3, and Chart.js v4 — no npm needed.
-=======
-# memory-machine
->>>>>>> 3071915d9c48c59736474998dc0d94bf6c22556f
+Frontend uses D3 v7, TopoJSON v3, and Chart.js v4 via CDN — no npm needed.
